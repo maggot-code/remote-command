@@ -1,0 +1,48 @@
+# Python / Django
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+*.pot
+*.pyc
+*.pkl
+*.mo
+*.coverage
+*.pytest_cache/
+*.migrations/
+.env
+venv/
+env/
+ENV/
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Django static / media
+staticfiles/
+media/
+uploads/
+
+# Ansible
+*.retry
+*.backup
+*.vault
+artifacts/
+inventory/
+# 如果你有临时生成的 inventory 或临时目录
+/tmp/
+*.ini
+*.yml
+*.yaml
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
+*.old
+*.orig
