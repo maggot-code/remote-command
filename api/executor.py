@@ -16,9 +16,17 @@ DEFAULT_WINDOWS_PORT = 5985
 DEFAULT_WINDOWS_SSL_PORT = 5986
 
 
-# ---------- 基础工具函数 ----------
-
 def confirm_port(os_type, password, port):
+    """
+    根据操作系统类型和用户输入,确认远程连接端口。
+    linux 默认 22,windows 默认 5985/5986。
+    Args:
+        os_type (str): 操作系统类型(linux/windows)
+        password (str|None): 密码(用于判断 winrm 端口)
+        port (int|None): 用户指定端口
+    Returns:
+        int: 端口号
+    """
     if port:  # 用户显式传入
         return int(port)
     if os_type == "linux":
@@ -30,10 +38,24 @@ def confirm_port(os_type, password, port):
 
 
 def confirm_host_pattern(os_type):
+    """
+    根据操作系统类型返回 ansible 主机组名。
+    Args:
+        os_type (str): 操作系统类型
+    Returns:
+        str: 主机组名
+    """
     return "linux_servers" if os_type == "linux" else "windows_servers"
 
 
 def confirm_public_template(os_type):
+    """
+    返回 ansible 公共连接参数模板。
+    Args:
+        os_type (str): 操作系统类型
+    Returns:
+        str: 公共参数字符串
+    """
     return {
         "linux": "ansible_connection=ssh ansible_python_interpreter=/usr/bin/python3",
         "windows": "ansible_connection=winrm ansible_winrm_transport=ntlm ansible_winrm_server_cert_validation=ignore"
@@ -41,10 +63,28 @@ def confirm_public_template(os_type):
 
 
 def confirm_os_template(os_type, port):
+    """
+    返回 ansible 端口参数模板。
+    Args:
+        os_type (str): 操作系统类型
+        port (int): 端口号
+    Returns:
+        str: 端口参数字符串
+    """
     return f"ansible_port={port}"
 
 
 def build_inventory(host_pattern, public_temp, os_temp, conn_info):
+    """
+    构建 ansible inventory 文件。
+    Args:
+        host_pattern (str): 主机组名
+        public_temp (str): 公共参数模板
+        os_temp (str): 端口参数模板
+        conn_info (dict): 连接信息(ip, username, password, port)
+    Returns:
+        (str, function): inventory 文件路径,关闭函数
+    """
     content = f"[{host_pattern}]\n"
     content += f"target ansible_host={conn_info['ip']} ansible_user={conn_info['username']} "
     if conn_info.get("password"):
@@ -58,9 +98,17 @@ def build_inventory(host_pattern, public_temp, os_temp, conn_info):
     return f.name, (lambda: os.unlink(f.name))
 
 
-# ---------- 任务构建函数 ----------
-
 def build_command(inventory, host_pattern, command, os_type="linux"):
+    """
+    构建 ansible 执行命令任务。
+    Args:
+        inventory (str): inventory 文件路径
+        host_pattern (str): 主机组名
+        command (str): 要执行的命令
+        os_type (str): 操作系统类型
+    Returns:
+        dict: 任务描述
+    """
     module = "shell" if os_type == "linux" else "win_shell"
     return {
         "inventory": inventory,
@@ -72,6 +120,16 @@ def build_command(inventory, host_pattern, command, os_type="linux"):
 
 
 def build_script(inventory, host_pattern, file_path, os_type="linux"):
+    """
+    构建 ansible 执行脚本任务。
+    Args:
+        inventory (str): inventory 文件路径
+        host_pattern (str): 主机组名
+        file_path (str): 脚本路径
+        os_type (str): 操作系统类型
+    Returns:
+        dict|list: 任务描述或任务列表(windows 下为多步)
+    """
     if os_type == "linux":
         return {
             "inventory": inventory,
@@ -109,9 +167,14 @@ def build_script(inventory, host_pattern, file_path, os_type="linux"):
         raise ValueError(f"Unsupported OS type: {os_type}")
 
 
-# ---------- 执行函数 ----------
-
 def execute_ansble(tasks):
+    """
+    执行 ansible 任务列表。
+    Args:
+        tasks (list): 任务列表(dict 或 list)
+    Returns:
+        dict: 执行结果,包括状态、job_id、原始结果等
+    """
     job_id = str(uuid.uuid4())
     results = {"status": "success", "job_id": job_id, "data": {}, "error": None, "raw": []}
 
@@ -156,9 +219,14 @@ def execute_ansble(tasks):
     return results
 
 
-# ---------- 提炼结果 ----------
-
 def extract_result(exec_result):
+    """
+    提取 ansible 执行结果,聚焦主要任务。
+    Args:
+        exec_result (dict): execute_ansble 返回结果
+    Returns:
+        dict: 提炼后的结果,包含状态、job_id、data、error
+    """
     if exec_result["status"] == "error":
         logging.error(f"[extract_result] error result: {exec_result}")
         return exec_result
