@@ -17,8 +17,7 @@ class RemoteCallView(APIView):
             return Response({
                 "status": "error",
                 "data": None,
-                "error": serializer.errors,
-                "job_id": None
+                "error": serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
 
         data = serializer.validated_data
