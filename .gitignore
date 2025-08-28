@@ -14,6 +14,7 @@ __pycache__/
 *.pytest_cache/
 *.migrations/
 .env
+.venv/
 venv/
 env/
 ENV/

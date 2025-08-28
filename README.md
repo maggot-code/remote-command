@@ -32,3 +32,82 @@ Ansible==跟随Python版本可用的最新版本
 
 测试：
 Linux：192.168.27.10 root/123
+
+调整：
+1. 合并接口，API层依然仅完成参数合法性校验，同时通过os_type选择对应service层对应的平台调用
+2. service层校验password是否可用，用于调用对应的biz层业务实例
+3. service层完全处理具体的业务参数，包括但不限于参数选择、参数默认值填充等
+
+后续计划：
+1. **deploy部分开发，提供不同的部署方式（可执行文件部署、远端脚本部署、镜像部署**
+2. 补全windows相关功能
+3. 抽离业务逻辑，找到可复用部分重构
+4. 为ansible增加对应模块的业务模板
+
+# 重构设计
+## 接口：/remote_call
+参数：
+1. os_type string required [linux | windows]
+2. ip string required
+3. username string required
+4. password string
+5. port number
+6. command string
+7. file_path string
+## 伪代码
+```python
+def remote_call(request):
+    # 参数合法性校验
+    value_err = parameter_verification(request.data)
+    if(value_err):
+        return Response(value_err)
+
+    # 基础信息准备
+    port = confirm_port(request.data.get("os_type"),request.data.get("password"),request.data.get("port"))
+    host_pattern = confirm_host_pattern(request.data.get("os_type"))
+    public_temp = confirm_public_template(request.data.get("os_type"))
+    os_temp = confirm_os_template(request.data.get("os_type"),port)
+
+    # 打包
+    inventory,build_close = build_inventory(host_pattern,public_temp,os_temp,{
+        "ip": request.data.get("ip"),
+        "username": request.data.get("username"),
+        "password": request.data.get("password"),
+        "port": port
+    })
+
+    # 任务准备
+    tasks = []
+    if(request.data.get("command")):
+        tasks.append(build_command(inventory,host_pattern,request.data.get("command")))
+    
+    if(request.data.get("file_path")):
+        tasks.append(build_command(inventory,host_pattern,request.data.get("file_path")))
+
+    # 执行任务
+    result = execute_ansble(tasks)
+
+    # 关闭构建
+    build_close()
+
+    if(result.errors):
+        return Response(result.errors)
+
+    return Response(result)
+```
+## 重构目标
+1. 提升代码可读性和可维护性
+2. 减少重复代码，提取公共逻辑
+3. 增强错误处理能力
+4. 优化性能，减少不必要的资源消耗
+5. 统一返回格式
+
+{
+    "ip": "192.168.27.10",
+    "username": "root",
+    "password":"123",
+    "port":22,
+    "command":"date",
+    "file_path":"/Users/codemaggot/code/remote_command/test/test.sh",
+    "os_type": "linux"
+}

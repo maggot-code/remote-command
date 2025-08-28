@@ -1,8 +1,6 @@
 from django.urls import path
-from . import views
+from .views import RemoteCallView
 
 urlpatterns = [
-    path('command', views.command, name='command'),
-    path('nopwd/command', views.nopwd_command, name='nopwd_command'),
-    path('script', views.script, name='script'),
+    path("remote_call", RemoteCallView.as_view(), name="remote_call"),
 ]
