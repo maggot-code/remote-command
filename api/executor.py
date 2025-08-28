@@ -145,13 +145,13 @@ def execute_ansble(tasks):
                 res = event["event_data"]["res"]
                 logging.error(f"[execute_ansble] FAILED host={host}, res={res}")
                 results["status"] = "error"
-                results["error"] = {"host": host, "detail": res}
+                results["error"] = res
             elif event["event"] == "runner_on_unreachable":
                 host = event["event_data"]["host"]
                 res = event["event_data"]["res"]
                 logging.error(f"[execute_ansble] UNREACHABLE host={host}, res={res}")
                 results["status"] = "error"
-                results["error"] = {"host": host, "detail": res}
+                results["error"] = res
 
         results["raw"].append({
             "task": f"{task['module']}:{task['args']}",
