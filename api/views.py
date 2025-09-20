@@ -3,11 +3,6 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from .serializers import RemoteCallSerializer
-from .executor import (
-    confirm_port, confirm_host_pattern, confirm_public_template,
-    confirm_os_template, build_inventory, build_command,
-    build_script, execute_ansble, extract_result
-)
 
 
 class RemoteCallView(APIView):
@@ -42,31 +37,8 @@ class RemoteCallView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         data = serializer.validated_data
-
-        port = confirm_port(data["os_type"], data.get("password"), data.get("port"))
-        host_pattern = confirm_host_pattern(data["os_type"])
-        public_temp = confirm_public_template(data["os_type"])
-        os_temp = confirm_os_template(data["os_type"], port)
-
-        inventory, build_close = build_inventory(
-            host_pattern, public_temp, os_temp, {
-                "ip": data["ip"],
-                "username": data["username"],
-                "password": data.get("password"),
-                "port": port
-            }
-        )
-
-        tasks = []
-        if data.get("command"):
-            tasks.append(build_command(inventory, host_pattern, data["command"], os_type=data["os_type"]))
-        if data.get("file_path"):
-            tasks.append(build_script(inventory, host_pattern, data["file_path"], os_type=data["os_type"]))
-
-        exec_result = execute_ansble(tasks)
-        final_result = extract_result(exec_result)
-
-        build_close()
-
-        http_status = status.HTTP_200_OK if final_result["status"] == "success" else status.HTTP_500_INTERNAL_SERVER_ERROR
-        return Response(final_result, status=http_status)
+        return Response({
+            "status": "success",
+            "data": data,
+            "error": None
+        }, status=status.HTTP_200_OK)
