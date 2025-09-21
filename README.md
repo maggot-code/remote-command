@@ -1,55 +1,92 @@
-# Ansible跳板机免密
 
-## 环境:
-1. Django Server(192.168.199.196)
-    * private key: /root/.ssh/id_rsa_ansible
-    * public key: /root/.ssh/id_rsa_ansible.pub
-2. 堡垒机(192.168.27.131)
-    * user: root
-    * password: 123
-    * private key: /root/.ssh/id_rsa
-    * publick key: /root/.ssh/id_rsa.pub
-    * authorized_keys: /root/.ssh/authorized_keys
-3. 内网节点(192.168.27.132)
-    * user: internal-node
-    * password: 123
-    * authorized_keys: /home/internal-node/.ssh/authorized_keys
+# Ansible 跳板机免密自动化平台
 
-## 版本:
-1. Python: 3.9.6
-2. Django: 4.2.23
-3. Ansible: 8.7.0
-4. Ansible-runner: 2.4.1
-5. OpenSSH:
-    5.1 Django Server: OpenSSH_9.9p2, LibreSSL 3.3.6
-    5.2 堡垒机: OpenSSH_8.7p1, OpenSSL 3.2.2 4 Jun 2024
-    5.3 内网节点: OpenSSH_8.7p1, OpenSSL 3.2.2 4 Jun 2024
+## 项目简介
 
-## 架构:
-1. Django Server与内网节点无法互通
-2. Django Server使用/root/.ssh/id_rsa_ansible对堡垒机免密
-3. 堡垒机使用/root/.ssh/id_rsa对内部节点免密
+本项目通过Django后端整合Ansible，实现堡垒机（跳板机）场景下对内网节点的自动化命令执行。平台支持多层SSH免密跳转，统一API接口，详细日志审计，适用于企业级自动化运维和合规追踪。
 
-## 需求:
-1. Django Server提供一个对外可以访问的接口用于接收用户提供的信息:
-    1.1 内部节点IP
-    1.2 内部节点用户
-    1.3 内部节点密码
-    1.4 内部节点上执行的命令
-    1.5 内部系统类型（linux or windows）
-2. Django Server整合用户提供的信息之后组装成为一个ansible上下文，提供给ansible_runner.run函数用于调用ansible执行
-3. Django Server中堡垒机的相关信息以配置文件的方式保存
-4. ansible首先会经过堡垒机，然后由堡垒机将流量转发到内部节点，最终在内部节点执行用户提供的命令，然后将结果返回到堡垒机，再由堡垒机返回到Django Server最终返回给用户完整整个业务流程
+## 目录结构
 
-## 设计补充
+```
+.
+├── ansible/           # Ansible相关封装与配置
+├── api/               # Django API接口
+├── artifacts/         # 任务执行产物与缓存
+├── deploy/            # 部署相关脚本
+├── logs/              # 日志文件
+├── remote_call/       # 远程调用与上下文服务
+├── server/            # Django服务端
+├── test/              # 测试用例
+├── manage.py
+├── pyproject.toml
+├── uv.lock
+├── db.sqlite3
+├── all.ini
+└── README.md
+```
 
-### 1. 日志与审计
-* 所有操作请求、参数、执行命令、结果、来源IP、时间等需详细记录。
-* 日志建议分级（INFO/WARN/ERROR），并支持按需查询。
-* 关键操作（如命令执行、配置变更）需有审计追踪，便于合规和溯源。
+## 环境依赖
 
-### 2. 结果回传与格式
-* 统一API返回格式，建议结构：
+- Python 3.9.6
+- Django 4.2.23
+- Ansible 8.7.0
+- Ansible-runner 2.4.1
+- OpenSSH（各节点版本见下表）
+
+| 角色         | IP                | 用户      | 密钥/密码位置                        | OpenSSH版本         |
+| ------------ | ----------------- | --------- | ------------------------------------ | ------------------- |
+| Django Server| 192.168.199.196   | root      | /root/.ssh/id_rsa_ansible            | 9.9p2, LibreSSL 3.3.6|
+| 堡垒机       | 192.168.27.131    | root      | /root/.ssh/id_rsa, /root/.ssh/authorized_keys | 8.7p1, OpenSSL 3.2.2|
+| 内网节点     | 192.168.27.132    | internal-node | /home/internal-node/.ssh/authorized_keys | 8.7p1, OpenSSL 3.2.2|
+
+## 系统架构
+
+- Django Server与内网节点无法直连，需经堡垒机跳转。
+- Django Server使用专用密钥对堡垒机免密，堡垒机再免密连接内网节点。
+- 用户通过API提交命令请求，后端组装Ansible上下文，调用ansible_runner执行，结果经堡垒机回传。
+
+<!-- 如有架构图可放置于docs/目录 -->
+
+## 快速开始
+
+1. 克隆项目并安装依赖
+
+     ```bash
+     git clone https://github.com/maggot-code/remote-command.git
+     cd remote-command
+     pip install -r requirements.txt
+     ```
+
+2. 配置堡垒机信息
+
+     - 编辑 `ansible/config.py` 或相关配置文件，填写堡垒机IP、用户、密钥路径等。
+
+3. 启动Django服务
+
+     ```bash
+     python manage.py migrate
+     python manage.py runserver 0.0.0.0:8000
+     ```
+
+4. 访问API接口（示例）
+
+     ```http
+     POST /api/execute/
+     Content-Type: application/json
+
+     {
+         "host": "192.168.27.132",
+         "user": "internal-node",
+         "password": "123",
+         "command": "uname -a",
+         "os_type": "linux"
+     }
+     ```
+
+## API设计
+
+- 统一返回格式：
+
     ```json
     {
         "code": 0,
@@ -63,26 +100,40 @@
         }
     }
     ```
-* 便于前端或调用方自动化处理和展示。
 
-### 3. 支持多种操作系统
-* 当前聚焦Linux节点，后续可扩展Windows等其他系统。
-* 建议抽象操作系统相关逻辑，采用策略模式或工厂模式，便于后续扩展。
-* 例如：
-    - `LinuxExecutor`、`WindowsExecutor`等实现统一接口。
-    - 命令模板、参数组装、结果解析等均可按操作系统定制。
+- 支持参数
+    - host: 内部节点IP
+    - user: 内部节点用户名
+    - password: 内部节点密码
+    - command: 执行命令
+    - os_type: 操作系统类型（linux/windows）
 
-### 4. 资源清理
-* ansible执行后产生的临时文件、日志、缓存等需定期清理。
-* 可通过定时任务（如crontab）或在业务流程结束后自动清理。
-* 防止磁盘空间被占满，提升系统稳定性。
+- 错误码与说明详见 [docs/error_codes.md](docs/error_codes.md)
 
-### 5. 错误处理
-* 对ansible_runner、SSH连接、参数校验等各环节的异常需有完善的捕获和处理。
-* API返回需明确错误码和错误信息，便于定位问题。
-* 建议对常见错误场景（如连接超时、认证失败、命令执行失败等）有专门的错误码和文档说明。
+## 日志与审计
 
-### 6. 认证与授权
-* 对外API需加认证（如Token、JWT、OAuth2等），防止未授权访问。
-* 可按用户、角色、权限粒度控制可执行的命令和可访问的节点。
-* 关键操作建议二次确认或多因子认证，提升安全性。
+- 所有操作请求、参数、命令、结果、来源IP、时间等均详细记录于 `logs/` 目录。
+- 日志分级（INFO/WARN/ERROR），支持按需查询。
+- 关键操作具备审计追踪能力，便于合规与溯源。
+
+## 安全与认证
+
+- API接口需认证（建议支持Token/JWT/OAuth2等）。
+- 支持用户、角色、权限粒度的命令与节点访问控制。
+- 关键操作建议二次确认或多因子认证。
+
+## 扩展性设计
+
+- 支持多操作系统（当前聚焦Linux，后续可扩展Windows等）。
+- 操作系统相关逻辑采用策略/工厂模式，便于扩展。
+- 资源清理机制：定期清理ansible临时文件、日志、缓存，防止磁盘占满。
+
+## 贡献指南
+
+1. Fork本仓库并新建分支
+2. 提交PR前请确保通过所有测试
+3. 详细描述变更内容及动机
+
+## License
+
+本项目采用 MIT License，详见 [LICENSE](LICENSE)。
