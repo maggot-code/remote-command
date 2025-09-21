@@ -71,13 +71,12 @@
 4. 访问API接口（示例）
 
      ```http
-     POST /api/execute/
+     POST /api/remote_call/
      Content-Type: application/json
 
      {
          "host": "192.168.27.132",
          "user": "internal-node",
-         "password": "123",
          "command": "uname -a",
          "os_type": "linux"
      }
