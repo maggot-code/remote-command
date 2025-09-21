@@ -125,10 +125,10 @@ class RemoteCallContext:
             return "-o StrictHostKeyChecking=no"
         # 跳板模式，拼接 ProxyCommand 及密钥参数
         return (
-            f"-o ProxyJump={ansible_cfg.bastion_user}@{ansible_cfg.bastion_ip} "
-            # f"-o ProxyCommand=\"ssh -i {ansible_cfg.jump_private_key} -W %h:%p {ansible_cfg.bastion_user}@{ansible_cfg.bastion_ip}\" "
-            f"-o StrictHostKeyChecking=no -i {ansible_cfg.jump_private_key}"
-            # f"-o StrictHostKeyChecking=no"
+            # f"-o ProxyJump={ansible_cfg.bastion_user}@{ansible_cfg.bastion_ip} "
+            f"-o ProxyCommand=\"ssh -i {ansible_cfg.jump_private_key} -W %h:%p {ansible_cfg.bastion_user}@{ansible_cfg.bastion_ip}\" "
+            # f"-o StrictHostKeyChecking=no -i {ansible_cfg.jump_private_key}"
+            f"-o StrictHostKeyChecking=no"
         )
 
     def to_dict(self) -> dict:
