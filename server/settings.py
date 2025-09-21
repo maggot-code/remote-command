@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -134,3 +135,61 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Ansible ENV
+BASTION_CONFIG = {
+    "WORKING_DIR": str(BASE_DIR),
+    "BASTION_IP": "192.168.27.131",
+    "BASTION_USER": "root",
+    "BASTION_PRIVATE_KEY": "/root/.ssh/id_rsa",
+    "BASTION_TEMP_PRIVATE_KEY": "~/.ssh/bastion_id_rsa",
+    "JUMP_PRIVATE_KEY": "~/.ssh/id_rsa_ansible",
+}
+
+# Logging configuration
+LOG_DIR = os.path.join(BASE_DIR, 'logs')
+os.makedirs(LOG_DIR, exist_ok=True)
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} [{name}:{lineno}] {funcName}: {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOG_DIR, 'django.log'),
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+        },
+        'ansible_file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOG_DIR, 'ansible.log'),
+            'formatter': 'verbose',
+            'encoding': 'utf-8',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'ansible': {
+            'handlers': ['ansible_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
