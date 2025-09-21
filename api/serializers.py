@@ -1,6 +1,9 @@
 from rest_framework import serializers
 
 class RemoteCallSerializer(serializers.Serializer):
+    """
+    只负责接口层参数校验，不做任何业务逻辑。
+    """
     os_type = serializers.ChoiceField(
         choices=["linux", "windows"],
         error_messages={
@@ -20,7 +23,7 @@ class RemoteCallSerializer(serializers.Serializer):
             "blank": "Username cannot be blank"
         }
     )
-    password = serializers.CharField(required=False,allow_blank=True)
+    password = serializers.CharField(required=False, allow_blank=True)
     port = serializers.IntegerField(
         required=False,
         min_value=1,
@@ -31,5 +34,7 @@ class RemoteCallSerializer(serializers.Serializer):
             "max_value": "Port cannot be greater than 65535"
         }
     )
-    command = serializers.CharField(required=False,allow_blank=True)
-    file_path = serializers.CharField(required=False,allow_blank=True)
+    command = serializers.CharField(required=False, allow_blank=True)
+    file_path = serializers.CharField(required=False, allow_blank=True)
+
+    use_bastion = serializers.BooleanField(required=False, default=True)
