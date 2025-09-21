@@ -36,5 +36,4 @@ class RemoteCallSerializer(serializers.Serializer):
     )
     command = serializers.CharField(required=False, allow_blank=True)
     file_path = serializers.CharField(required=False, allow_blank=True)
-
     use_bastion = serializers.BooleanField(required=False, default=True)
