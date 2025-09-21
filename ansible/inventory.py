@@ -33,7 +33,7 @@ def generate_inventory(
 	host_params = [
 		f"{user_ctx.ip}",
 		f"ansible_user={user_ctx.username}",
-		f"ansible_port={user_ctx.port}"
+		f"ansible_port={user_ctx.get_port()}"  # 修改为调用 get_port() 方法
 	]
 
 	# 添加认证参数（如密码/密钥等）

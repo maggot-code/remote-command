@@ -60,12 +60,27 @@ class RemoteCallContext:
         """
         return self.use_bastion
 
+    def get_port(self) -> int:
+        """
+        获取目标主机的端口号，默认为 22。
+        需要判断目前执行模式是否为 Windows，Windows 默认端口为 5986。
+        同时需要注意windows情况下如果用户传了port，则使用用户传的port
+        而且windows免密的话，port必须是5986
+        其他情况一律使用22
+        :return: 端口号整数。
+        """
+        if self.is_windows():
+            if self.password is None:
+                return 5986
+            return self.port if self.port else 5986
+        return self.port if self.port else 22
+    
     def get_target_addr(self) -> str:
         """
         获取目标主机的地址（IP:端口）。
         :return: 形如 '192.168.1.1:22' 的字符串。
         """
-        return f"{self.ip}:{self.port}"
+        return f"{self.ip}:{self.get_port()}"
     
     def get_group_name(self) -> str:
         """
@@ -108,10 +123,12 @@ class RemoteCallContext:
         if not self.is_use_bastion() or not ansible_cfg:
             # 直连模式，仅关闭主机密钥检查
             return "-o StrictHostKeyChecking=no"
-        # 跳板模式，拼接 ProxyJump 及密钥参数
+        # 跳板模式，拼接 ProxyCommand 及密钥参数
         return (
             f"-o ProxyJump={ansible_cfg.bastion_user}@{ansible_cfg.bastion_ip} "
+            # f"-o ProxyCommand=\"ssh -i {ansible_cfg.jump_private_key} -W %h:%p {ansible_cfg.bastion_user}@{ansible_cfg.bastion_ip}\" "
             f"-o StrictHostKeyChecking=no -i {ansible_cfg.jump_private_key}"
+            # f"-o StrictHostKeyChecking=no"
         )
 
     def to_dict(self) -> dict:
