@@ -45,6 +45,8 @@
 5. 文档和注释要及时补充，方便团队协作和后期维护。
 
 ---
+## 六、踩坑
+1. paramiko包的sftp通道，使用交互式终端，导致如果使用绝对路径时会自动拼接到当前目录后(pwd)，所以需要保证路径正确，使用相对路径。
 
 参考资料：
 1. https://forum.ansible.com/t/unsupported-feature-ansible-through-a-jump-server/26130/2
