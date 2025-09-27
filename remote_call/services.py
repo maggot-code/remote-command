@@ -6,10 +6,11 @@
 3. 组装 Ansible 任务上下文。
 4. 调用 ansible runner 执行任务。
 """
-from .context import RemoteCallContext
+from remote_call.context import RemoteCallContext
 from ansible.runner import AnsibleTaskContext,run_ansible_with_context
 from ansible.config import get_ansible_config
 from ansible.inventory import generate_inventory
+from ansible.playbook import generate_playbook
 
 
 def RemoteCallService(data: dict):
@@ -35,7 +36,7 @@ def RemoteCallService(data: dict):
 
     # 2. 生成 ansible 配置
     # get_ansible_config 返回 ansible 相关的配置信息
-    config_context = get_ansible_config()
+    config_context = get_ansible_config(user_context)
 
     # 3. 组装 AnsibleTaskContext（自动推断参数）
     # 该步骤可能因参数不合法等原因抛出异常
@@ -53,6 +54,7 @@ def RemoteCallService(data: dict):
     # 4. 生成 inventory 文件
     # generate_inventory 返回 inventory 路径和清理函数
     inventory_path, cleanup = generate_inventory(user_context, config_context)
+    playbook_path, playbook_cleanup = generate_playbook(user_context, config_context)
 
     # 5. 调用 ansible runner 执行任务
     # run_ansible_with_context 为纯函数，实际执行 ansible 任务
@@ -60,10 +62,12 @@ def RemoteCallService(data: dict):
         user_context,
         config_context,
         task_context,
-        inventory_path
+        inventory_path,
+        playbook_path
     )
     # 执行完毕后清理临时 inventory 文件
     cleanup()
+    playbook_cleanup()
 
     # 返回结构化结果，便于后续扩展
     return {
@@ -73,5 +77,4 @@ def RemoteCallService(data: dict):
         "error": result.get("error"),
         "status": result.get("status", "success")
     }
-
 

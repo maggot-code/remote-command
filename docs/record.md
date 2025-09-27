@@ -8,3 +8,5 @@
 8. https://forum.ansible.com/t/ansible-jumpbox-bastion-host-configuration-and-private-server/2162/2
 9. https://forum.ansible.com/t/centos-ansible2-5-jump-bastion-server-inventory/28649/5
 10. https://forum.ansible.com/t/connect-via-not-a-bastion-jump-host/23826/6
+
+11. https://github.com/H3C/h3c_open.comware?utm_source=chatgpt.com

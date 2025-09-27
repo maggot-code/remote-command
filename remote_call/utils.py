@@ -2,16 +2,6 @@ import tempfile
 import os
 from typing import Any, Optional
 
-def is_valid_ip(ip: str) -> bool:
-    """
-    判断给定字符串是否为简单的IPv4地址格式（仅检查点分四段，不校验数值范围）。
-    TODO: 可用正则或ipaddress模块增强校验。
-    :param ip: 待校验的IP字符串
-    :return: 是否为简单IPv4格式
-    """
-    # 这里只做了最基础的点分四段判断，未校验每段是否为0-255
-    return isinstance(ip, str) and len(ip.split('.')) == 4
-
 def build_response(
     status: str = "success",
     data: Any = None,

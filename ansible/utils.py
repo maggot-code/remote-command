@@ -1,6 +1,8 @@
 import paramiko
 import os
+import logging
 
+logger = logging.getLogger('django')
 
 def fetch_bastion_key(user_context, config_context):
 	"""
@@ -19,28 +21,43 @@ def fetch_bastion_key(user_context, config_context):
 	"""
 	ssh = paramiko.SSHClient()
 	ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # 自动接受未知主机密钥
-	# 用跳板机私钥连接堡垒机
-	ssh.connect(
-		config_context.bastion_ip,
-		username=config_context.bastion_user,
-		key_filename=config_context.jump_private_key
-	)
 	
-	sftp = ssh.open_sftp()
-	# 从堡垒机拉取目标私钥到本地临时路径
-	sftp.get(config_context.bastion_private_key, config_context.bastion_temp_private_key)
-	sftp.close()
-	ssh.close()
-	# 设置本地密钥权限为 600，防止权限过宽被 SSH 拒绝
-	os.chmod(config_context.bastion_temp_private_key, 0o600)
+    # 用跳板机私钥连接堡垒机
+	try:
+		ssh.connect(
+			hostname=config_context.bastion_ip,
+            username=config_context.bastion_user,
+            key_filename=config_context.jump_private_key
+        )
+	except Exception as e:
+		logger.error(f"Failed to connect to bastion: {e}")
+		raise
 
+    # 从堡垒机拉取目标私钥到本地临时路径
+	try:
+		sftp = ssh.open_sftp()
+		sftp.get(config_context.bastion_private_key, config_context.bastion_temp_private_key_with_user)
+		sftp.close()
+	except Exception as e:
+		logger.error(f"Failed to fetch private key from bastion: {e}")
+		raise
+	finally:
+		ssh.close()
+		
+    # 设置本地密钥权限为 600，防止权限过宽被 SSH 拒绝
+	try:
+		os.chmod(config_context.bastion_temp_private_key_with_user, 0o600)
+	except Exception as e:
+		logger.error(f"Failed to set private key permissions: {e}")
+	
+    #清理本地临时密钥文件
 	def cleanup():
 		"""
 		清理本地临时密钥文件，异常时忽略错误。
 		"""
 		try:
-			if os.path.exists(config_context.bastion_temp_private_key):
-				os.remove(config_context.bastion_temp_private_key)
+			if os.path.exists(config_context.bastion_temp_private_key_with_user):
+				os.remove(config_context.bastion_temp_private_key_with_user)
 		except Exception:
 			pass
 	return cleanup

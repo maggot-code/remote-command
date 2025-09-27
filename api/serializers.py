@@ -34,6 +34,12 @@ class RemoteCallSerializer(serializers.Serializer):
             "max_value": "Port cannot be greater than 65535"
         }
     )
+    erp = serializers.CharField(
+        error_messages={
+            "required": "ERP is required",
+            "blank": "ERP cannot be blank"
+        }
+    )
     command = serializers.CharField(required=False, allow_blank=True)
     file_path = serializers.CharField(required=False, allow_blank=True)
     use_bastion = serializers.BooleanField(required=False, default=True)

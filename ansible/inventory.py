@@ -3,18 +3,19 @@
 本模块根据用户上下文和 Ansible 配置，动态拼接 inventory 内容并写入临时文件，
 用于后续 ansible-playbook 或 ansible 命令的调用。
 """
+from typing import Tuple, Callable
 from remote_call.utils import write_temp_file
 from remote_call.context import RemoteCallContext
 from ansible.config import AnsibleConfig
 import logging
 
-logger = logging.getLogger('ansible')
+logger = logging.getLogger('django')
 
 def generate_inventory(
 	user_ctx: 'RemoteCallContext',
 	ansible_cfg: 'AnsibleConfig',
 	extra_vars: dict = None
-) -> tuple[str, callable]:
+) -> Tuple[str, Callable]:
 	"""
 	动态生成 ansible inventory 内容并写入临时文件。
 
@@ -35,6 +36,14 @@ def generate_inventory(
 		f"ansible_user={user_ctx.username}",
 		f"ansible_port={user_ctx.get_port()}"  # 修改为调用 get_port() 方法
 	]
+	
+    # 添加基础参数
+	if user_ctx.is_linux():
+		host_params.append(user_ctx.get_linux_inventory())
+	if user_ctx.is_windows():
+		host_params.append(user_ctx.get_windows_inventory())
+	if user_ctx.is_h3c():
+		host_params.append(user_ctx.get_h3c_inventory())
 
 	# 添加认证参数（如密码/密钥等）
 	host_params.extend(user_ctx.get_auth_params(ansible_cfg))
@@ -56,7 +65,7 @@ def generate_inventory(
 	content = f"[{group_name}]\n{host_line}\n"
 
 	# 日志记录 inventory 内容，便于调试
-	logger.info("[Inventory Content]:\n%s", content)
+	logger.info("[Inventory Content : ERP - %s]:\n%s",user_ctx.get_erp(), content)
 
 	# 写入临时文件，返回文件路径和清理函数
 	file_path, close_func, cleanup_func = write_temp_file(content, suffix=".ini")

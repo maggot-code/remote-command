@@ -13,7 +13,7 @@ class AnsibleConfig:
 	支持从 settings.BASTION_CONFIG 或环境变量读取配置。
 	"""
 
-	def __init__(self):
+	def __init__(self, user_context=None):
 		"""
 		初始化 ansible 配置。
 		优先从 Django settings 的 BASTION_CONFIG 读取配置，若无则回退到环境变量。
@@ -45,26 +45,35 @@ class AnsibleConfig:
 		self.jump_private_key = os.path.expanduser(
 			cfg.get("JUMP_PRIVATE_KEY") or os.getenv("JUMP_PRIVATE_KEY") or ""
 		)
+		
+
+		if user_context is not None:
+			self.bastion_temp_private_key_with_user = (
+                f"{self.bastion_temp_private_key}_{user_context.erp}_{user_context.uuid}"
+            )
+		else:
+			self.bastion_temp_private_key_with_user = self.bastion_temp_private_key
 
 	def to_dict(self):
 		"""
 		将配置对象转为字典，便于序列化或调试。
 		:return: dict 形式的 ansible 配置
 		"""
+			
 		return {
 			"WORKING_DIR": self.working_dir,
 			"BASTION_IP": self.bastion_ip,
 			"BASTION_USER": self.bastion_user,
 			"BASTION_PRIVATE_KEY": self.bastion_private_key,
 			"BASTION_TEMP_PRIVATE_KEY": self.bastion_temp_private_key,
+			"BASTION_TEMP_PRIVATE_KEY_WITH_USER": self.bastion_temp_private_key_with_user,
 			"JUMP_PRIVATE_KEY": self.jump_private_key,
 		}
 
 
-def get_ansible_config() -> AnsibleConfig:
+def get_ansible_config(user_context=None) -> AnsibleConfig:
 	"""
 	获取 ansible 内部配置上下文对象。
 	:return: AnsibleConfig 实例
 	"""
-	return AnsibleConfig()
-
+	return AnsibleConfig(user_context)

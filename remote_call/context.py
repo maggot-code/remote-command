@@ -5,18 +5,24 @@
 """
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any
+import uuid
 
 @dataclass
 class RemoteCallContext:
     os_type: str
     ip: str
     username: str
+    erp: str
     password: Optional[str] = None
-    port: int = 22
+    port: Optional[int] = None
     command: Optional[str] = None
     file_path: Optional[str] = None
     use_bastion: bool = True
     extra: Dict[str, Any] = field(default_factory=dict)
+    uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
+
+    def get_uuid(self) -> str:
+        return  self.uuid
 
     def is_linux(self) -> bool:
         """
@@ -31,6 +37,9 @@ class RemoteCallContext:
         :return: 是 Windows 返回 True，否则返回 False。
         """
         return self.os_type.lower() == "windows"
+    
+    def is_h3c(self) -> bool:
+        return self.os_type.lower() == "h3c"
 
     def is_command_mode(self) -> bool:
         """
@@ -60,20 +69,42 @@ class RemoteCallContext:
         """
         return self.use_bastion
 
+    def get_linux_inventory(self) -> str:
+        return "ansible_connection=ssh"
+    
+    def get_windows_inventory(self) -> str:
+         return "ansible_connection=winrm ansible_winrm_server_cert_validation=ignore ansible_winrm_transport=ntlm"
+    
+    def get_h3c_inventory(self) -> str:
+        return "ansible_ssh_type=paramiko ansible_connection=ssh ansible_shell_type=sh ansible_shell_executable=/bin/sh"
+
+
+    def get_erp(self) -> str:
+        return  self.erp
+
     def get_port(self) -> int:
         """
-        获取目标主机的端口号，默认为 22。
-        需要判断目前执行模式是否为 Windows，Windows 默认端口为 5986。
-        同时需要注意windows情况下如果用户传了port，则使用用户传的port
-        而且windows免密的话，port必须是5986
-        其他情况一律使用22
-        :return: 端口号整数。
+        获取目标主机的端口号。
+
+        优先级说明：
+        1. 如果用户传入了 port，则直接返回该端口号。
+        2. 如果未传入 port：
+            - Windows 平台：
+                - 未提供 password（免密登录），返回 5986。
+                - 提供了 password（账号密码登录），返回 5985。
+            - 非 Windows 平台：
+                - 返回 22（SSH 默认端口）。
+
+        :return: 端口号（int）
         """
+        if self.port:
+            return self.port
         if self.is_windows():
             if self.password is None:
                 return 5986
-            return self.port if self.port else 5986
-        return self.port if self.port else 22
+            else:
+                return 5985
+        return 22
     
     def get_target_addr(self) -> str:
         """
@@ -91,6 +122,8 @@ class RemoteCallContext:
             return "linux_servers"
         elif self.is_windows():
             return "windows_servers"
+        elif self.is_h3c():
+            return "h3c_servers"
         return "target"
     
     def get_auth_params(self, ansible_cfg=None) -> list:
@@ -106,7 +139,7 @@ class RemoteCallContext:
             return params
         # 仅密钥认证且 use_bastion 为 True 时添加密钥参数
         if ansible_cfg and self.is_use_bastion():
-            key_path = getattr(ansible_cfg, 'bastion_temp_private_key', None) or self.extra.get('private_key', '')
+            key_path = getattr(ansible_cfg, 'bastion_temp_private_key_with_user', None) or self.extra.get('private_key', '')
             if key_path:
                 params.append(f"ansible_ssh_private_key_file={key_path}")
         return params
@@ -117,17 +150,24 @@ class RemoteCallContext:
         :param ansible_cfg: 可选，AnsibleConfig对象，提供跳板机相关信息。
         :return: SSH 连接参数字符串。
         """
+        if  self.is_h3c():
+            return (
+                f"-o StrictHostKeyChecking=no "
+                f"-o KexAlgorithms=+diffie-hellman-group1-sha1 "
+                f"-o HostKeyAlgorithms=+ssh-rsa"
+            )
         # 密码认证时不添加 ssh_common_args
         if self.is_password_auth():
             return ""
         if not self.is_use_bastion() or not ansible_cfg:
             # 直连模式，仅关闭主机密钥检查
-            return "-o StrictHostKeyChecking=no"
+            return (
+                f"-o StrictHostKeyChecking=no"
+            )
         # 跳板模式，拼接 ProxyCommand 及密钥参数
         return (
             # f"-o ProxyJump={ansible_cfg.bastion_user}@{ansible_cfg.bastion_ip} "
-            f"-o ProxyCommand=\"ssh -i {ansible_cfg.jump_private_key} -W %h:%p {ansible_cfg.bastion_user}@{ansible_cfg.bastion_ip}\" "
-            # f"-o StrictHostKeyChecking=no -i {ansible_cfg.jump_private_key}"
+            f"-o ProxyCommand=\"ssh -o ControlMaster=no -i {ansible_cfg.jump_private_key} -W %h:%p {ansible_cfg.bastion_user}@{ansible_cfg.bastion_ip}\" "
             f"-o StrictHostKeyChecking=no"
         )
 
@@ -141,4 +181,3 @@ class RemoteCallContext:
         if 'use_bastion' not in d:
             d['use_bastion'] = True
         return d
-

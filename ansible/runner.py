@@ -4,7 +4,7 @@ ansible_runner 相关的上下文模型与执行封装。
 """
 
 import ansible_runner
-from .utils import fetch_bastion_key,extract_ansible_events
+from ansible.utils import fetch_bastion_key,extract_ansible_events
 
 class AnsibleTaskContext:
     """
@@ -59,12 +59,14 @@ class AnsibleTaskContext:
     def _get_command_module(self):
         """
         获取命令模式下的 ansible module。
-        Linux: shell，Windows: win_shell。
+        Linux: shell，Windows: win_shell，H3C: h3c_command。
         """
         if self.user_context.is_linux():
             return "shell"
         elif self.user_context.is_windows():
             return "win_shell"
+        elif self.user_context.is_h3c():
+            return "h3c.network.h3c_command"
         else:
             raise ValueError("不支持的操作系统类型")
 
@@ -98,13 +100,14 @@ class AnsibleTaskContext:
         """
         return self.error is not None
     
-    def get_task_chain(self, inventory_path):
+    def get_task_chain(self, inventory_path,playbook_path=None):
         """
         根据上下文生成 ansible 任务链：
         - Linux 命令/脚本：单步任务
         - Windows 命令：单步任务
         - Windows 脚本：三步任务链（win_copy, win_shell, win_file）
         :param inventory_path: ansible inventory 路径
+        :param playbook_path: ansible playbook 路径
         :return: list[dict] 任务链
         """
         if self.user_context.is_linux():
@@ -152,6 +155,15 @@ class AnsibleTaskContext:
                         "focus": False
                     }
                 ]
+        elif self.user_context.is_h3c():
+            # H3C 设备，返回 playbook 模式任务描述
+            return [{
+                "inventory": inventory_path,
+                "host_pattern": self.host_pattern,
+                "playbook": playbook_path,  # 需后续生成 playbook 文件路径
+                "focus": True
+            }]
+
         # 兜底：返回单步
         return [{
             "inventory": inventory_path,
@@ -162,7 +174,7 @@ class AnsibleTaskContext:
         }]
 
 
-def run_ansible_with_context(user_context, config_context, task_context, inventory_path):
+def run_ansible_with_context(user_context, config_context, task_context, inventory_path, playbook_path):
     """
     执行 ansible_runner.run 并处理结果，返回统一结构。
     :param user_context: RemoteCallContext 用户上下文
@@ -176,7 +188,7 @@ def run_ansible_with_context(user_context, config_context, task_context, invento
         # 若使用堡垒机，先准备密钥，返回 cleanup 回调
         cleanup = fetch_bastion_key(user_context, config_context)
 
-    task_chain = task_context.get_task_chain(inventory_path)
+    task_chain = task_context.get_task_chain(inventory_path,playbook_path)
     all_results = []  # 所有任务的结果
     focus_result = None  # 主任务的结果
     error = None
@@ -184,14 +196,29 @@ def run_ansible_with_context(user_context, config_context, task_context, invento
     try:
         for task in task_chain:
             # 执行每个任务（支持多步任务链）
-            r = ansible_runner.run(
-                private_data_dir=config_context.working_dir,
-                inventory=task["inventory"],
-                host_pattern=task["host_pattern"],
-                module=task["module"],
-                module_args=task["args"],
-                quiet=True
-            )
+            if user_context.is_h3c():
+                r = ansible_runner.run(
+                    private_data_dir=config_context.working_dir,
+                    inventory=task["inventory"],
+                    playbook=task['playbook'],
+                    quiet=True,
+                    envvars={
+                        "ANSIBLE_SSH_ARGS": "-o ControlMaster=no -o ControlPath=none",
+                        "ANSIBLE_HOST_KEY_CHECKING": "False"
+                    }
+                )
+            else:
+                r = ansible_runner.run(
+                    private_data_dir=config_context.working_dir,
+                    inventory=task["inventory"],
+                    host_pattern=task["host_pattern"],
+                    module=task["module"],
+                    module_args=task["args"],
+                    quiet=True,
+                    envvars={
+                        "ANSIBLE_SSH_ARGS": "-o ControlMaster=no -o ControlPath=none"
+                    }
+                )
             # 解析 ansible 执行事件，提取结果、错误、事件数据
             results, task_error, event_data = extract_ansible_events(r)
             all_results.append({
