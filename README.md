@@ -136,3 +136,49 @@
 ## License
 
 本项目采用 MIT License，详见 [LICENSE](LICENSE)。
+
+
+```python
+class UserContext:
+    INTERACTIVE_KEYWORDS = ["disable", "enable", "y", "yes"]
+
+    def __init__(self, command_list):
+        self.command = command_list
+
+    def use_interaction(self):
+        """
+        判断是否需使用 send_command_timing
+        """
+        for cmd in self.command:
+            if self._has_interactive_keyword(cmd):
+                return True
+        return False
+
+    def _has_interactive_keyword(self, cmd):
+        """
+        判断当前命令是否属于交互式命令。
+        可进一步扩展成正则或 DSL。
+        """
+        lower_cmd = cmd.strip().lower()
+        return any(k in lower_cmd for k in self.INTERACTIVE_KEYWORDS)
+
+    def get_command(self):
+        """
+        返回命令数组（让 service 层保持解耦）
+        """
+        return self.command
+
+
+def execute_command(conn, user_ctx):
+    if user_ctx.use_interaction():
+        # 使用交互模式
+        output = ""
+        for cmd in user_ctx.get_command():
+            r = conn.send_command_timing(cmd)
+            output += r + "\n"
+        return output
+    else:
+        # 使用配置集，一次发
+        return conn.send_config_set(user_ctx.get_command())
+
+```
