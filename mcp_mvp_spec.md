@@ -152,3 +152,18 @@ mcp-remote-exec/
 **告警 → LLM 分析 → 远程执行命令 → RCA 结果**
 
 Dify / FastMCP / 现有远程命令执行服务之间的组合能够快速形成一个具备实战价值的自动化运维分析流水线。
+
+
+```toml
+[project]
+name = "undev-mcp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+	"fastmcp==2.13.3",
+	"httpx>=0.28.1,<0.29",
+]
+
+```
